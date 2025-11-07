@@ -47,7 +47,7 @@ async def request_trial_confirmation_handler(
         await callback.message.edit_text(
             _("trial_feature_disabled"),
             reply_markup=get_main_menu_inline_keyboard(
-                current_lang, i18n, settings, False
+                current_lang, i18n, settings
             ),
         )
         try:
@@ -60,7 +60,7 @@ async def request_trial_confirmation_handler(
         await callback.message.edit_text(
             _("trial_already_had_subscription_or_trial"),
             reply_markup=get_main_menu_inline_keyboard(
-                current_lang, i18n, settings, False
+                current_lang, i18n, settings
             ),
         )
         try:
@@ -75,7 +75,6 @@ async def request_trial_confirmation_handler(
     )
 
     final_message_text_in_chat = ""
-    show_trial_button_after_action = False
     config_link_for_trial = None
 
     if activation_result and activation_result.get("activated"):
@@ -132,22 +131,13 @@ async def request_trial_confirmation_handler(
             await callback.answer(final_message_text_in_chat, show_alert=True)
         except Exception:
             pass
-        if (
-            settings.TRIAL_ENABLED
-            and not await subscription_service.has_had_any_subscription(
-                session, user_id
-            )
-        ):
-            show_trial_button_after_action = True
 
     reply_markup = (
         get_connect_and_main_keyboard(
             current_lang, i18n, settings, config_link_for_trial
         )
         if activation_result and activation_result.get("activated")
-        else get_main_menu_inline_keyboard(
-            current_lang, i18n, settings, show_trial_button_after_action
-        )
+        else get_main_menu_inline_keyboard(current_lang, i18n, settings)
     )
 
     try:
@@ -220,7 +210,6 @@ async def confirm_activate_trial_handler(
     )
 
     final_message_text_in_chat = ""
-    show_trial_button_after_action = False
     config_link_for_trial = None
 
     if activation_result and activation_result.get("activated"):
@@ -265,22 +254,12 @@ async def confirm_activate_trial_handler(
             await callback.answer(final_message_text_in_chat, show_alert=True)
         except Exception:
             pass
-        if (
-            settings.TRIAL_ENABLED
-            and not await subscription_service.has_had_any_subscription(
-                session, user_id
-            )
-        ):
-            show_trial_button_after_action = True
-
     reply_markup = (
         get_connect_and_main_keyboard(
             current_lang, i18n, settings, config_link_for_trial
         )
         if activation_result and activation_result.get("activated")
-        else get_main_menu_inline_keyboard(
-            current_lang, i18n, settings, show_trial_button_after_action
-        )
+        else get_main_menu_inline_keyboard(current_lang, i18n, settings)
     )
 
     try:
