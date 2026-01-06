@@ -79,6 +79,23 @@ async def update_menu_message(
         else:
             logging.warning("Menu image file not found: %s", image_path)
 
+    # If current message is a photo but no new image was applied, update caption instead of text.
+    if message.photo:
+        try:
+            await message.edit_caption(
+                caption=text,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode,
+            )
+            return True
+        except TelegramBadRequest as caption_error:
+            if "message is not modified" in str(caption_error).lower():
+                logging.debug("Menu caption not modified for message %s", message.message_id)
+            else:
+                logging.warning("Failed to edit caption for menu: %s", caption_error)
+        except Exception as caption_error:
+            logging.error("Unexpected error while editing menu caption: %s", caption_error)
+
     try:
         await message.edit_text(
             text,

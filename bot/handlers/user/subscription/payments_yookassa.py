@@ -10,10 +10,13 @@ from bot.keyboards.inline.user_keyboards import (
     get_yk_autopay_choice_keyboard,
     get_yk_saved_cards_keyboard,
 )
+from bot.utils.menu_renderer import update_menu_message
 from bot.middlewares.i18n import JsonI18n
 from bot.services.yookassa_service import YooKassaService
 from config.settings import Settings
 from db.dal import payment_dal, user_billing_dal
+from aiogram.enums import ParseMode
+from bot.handlers.user.subscription.core import _menu_image_if_exists, _send_menu_with_image
 
 router = Router(name="user_subscription_payments_yookassa_router")
 
@@ -72,7 +75,7 @@ async def _initiate_yk_payment(
     payment_method_id: Optional[str] = None,
     selected_method_internal_id: Optional[int] = None,
     sale_mode: str = "subscription",
-) -> bool:
+    ) -> bool:
     """Create payment record and initiate YooKassa payment (new card or saved card)."""
     if not callback.message:
         return False
@@ -211,44 +214,43 @@ async def _initiate_yk_payment(
                 pass
             return False
 
+        price_display = _format_value(price_rub)
+        currency_symbol = settings.DEFAULT_CURRENCY_SYMBOL
+        payment_text = get_text(
+            key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+            months=int(months),
+            traffic_gb=_format_value(months),
+            price=price_display,
+            currency_symbol=currency_symbol,
+        )
+        markup = get_payment_url_keyboard(
+            payment_response_yk["confirmation_url"],
+            current_lang,
+            i18n,
+            back_callback=back_callback,
+            back_text_key="back_to_payment_methods_button",
+        )
+        image_name = _menu_image_if_exists("menu_subscribe.png")
         try:
-            await callback.message.edit_text(
-                get_text(
-                    key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
-                    months=int(months),
-                    traffic_gb=_format_value(months),
-                ),
-                reply_markup=get_payment_url_keyboard(
-                    payment_response_yk["confirmation_url"],
-                    current_lang,
-                    i18n,
-                    back_callback=back_callback,
-                    back_text_key="back_to_payment_methods_button",
-                ),
-                disable_web_page_preview=False,
+            await update_menu_message(
+                callback.message,
+                payment_text,
+                image_name,
+                reply_markup=markup,
+                parse_mode=ParseMode.HTML,
+                disable_link_preview=True,
             )
         except Exception as e_edit:
             logging.warning(
                 f"Edit message for payment link failed: {e_edit}. Sending new one."
             )
-            try:
-                await callback.message.answer(
-                    get_text(
-                        key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
-                        months=int(months),
-                        traffic_gb=_format_value(months),
-                    ),
-                    reply_markup=get_payment_url_keyboard(
-                        payment_response_yk["confirmation_url"],
-                        current_lang,
-                        i18n,
-                        back_callback=back_callback,
-                        back_text_key="back_to_payment_methods_button",
-                    ),
-                    disable_web_page_preview=False,
-                )
-            except Exception:
-                pass
+            await _send_menu_with_image(
+                callback.message,
+                payment_text,
+                image_name,
+                reply_markup=markup,
+                parse_mode=ParseMode.HTML,
+            )
         return True
 
     if payment_response_yk and payment_method_id:

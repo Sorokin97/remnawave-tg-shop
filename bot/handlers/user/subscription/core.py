@@ -1,8 +1,10 @@
 import hashlib
 import logging
+from pathlib import Path
 from aiogram import Router, F, types, Bot
+from aiogram.enums import ParseMode
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, LinkPreviewOptions, WebAppInfo
 from typing import Optional, Union
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,8 +21,49 @@ from bot.services.panel_api_service import PanelApiService
 from bot.middlewares.i18n import JsonI18n
 from db.dal import subscription_dal, user_billing_dal
 from db.models import Subscription
+from bot.utils.menu_renderer import update_menu_message
 
 router = Router(name="user_subscription_core_router")
+
+MENU_IMAGES_ROOT = Path("/app/bot/static/images")
+
+
+def _menu_image_if_exists(filename: str) -> Optional[str]:
+    image_path = MENU_IMAGES_ROOT / filename
+    return filename if image_path.is_file() else None
+
+
+async def _send_menu_with_image(
+    target_message: types.Message,
+    text: str,
+    image_filename: Optional[str],
+    reply_markup=None,
+    parse_mode: Optional[str] = ParseMode.HTML,
+):
+    """Send a new menu message with an optional background image."""
+    link_preview_disabled = LinkPreviewOptions(is_disabled=True)
+    if image_filename:
+        image_path = MENU_IMAGES_ROOT / image_filename
+        try:
+            await target_message.answer_photo(
+                FSInputFile(str(image_path)),
+                caption=text,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode,
+            )
+            return
+        except Exception as send_photo_error:
+            logging.warning(
+                "Failed to send menu photo %s: %s",
+                image_path,
+                send_photo_error,
+            )
+    await target_message.answer(
+        text,
+        reply_markup=reply_markup,
+        parse_mode=parse_mode,
+        link_preview_options=link_preview_disabled,
+    )
 
 
 def _shorten_hwid_for_display(hwid: Optional[str], max_length: int = 24) -> str:
@@ -77,9 +120,11 @@ async def display_subscription_options(event: Union[types.Message, types.Callbac
         reply_markup = get_subscription_options_keyboard(
             options, currency_symbol_val, current_lang, i18n, traffic_mode=traffic_mode
         )
+        image_name = _menu_image_if_exists("menu_subscribe.png")
     else:
         text_content = get_text("no_subscription_options_available")
         reply_markup = get_back_to_main_menu_markup(current_lang, i18n)
+        image_name = None
 
     target_message_obj = event.message if isinstance(event, types.CallbackQuery) else event
     if not target_message_obj:
@@ -92,15 +137,32 @@ async def display_subscription_options(event: Union[types.Message, types.Callbac
 
     if isinstance(event, types.CallbackQuery):
         try:
-            await target_message_obj.edit_text(text_content, reply_markup=reply_markup)
+            await update_menu_message(
+                target_message_obj,
+                text_content,
+                image_name,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML,
+                disable_link_preview=True,
+            )
         except Exception:
-            await target_message_obj.answer(text_content, reply_markup=reply_markup)
+            await _send_menu_with_image(
+                target_message_obj,
+                text_content,
+                image_name,
+                reply_markup=reply_markup,
+            )
         try:
             await event.answer()
         except Exception:
             pass
     else:
-        await target_message_obj.answer(text_content, reply_markup=reply_markup)
+        await _send_menu_with_image(
+            target_message_obj,
+            text_content,
+            image_name,
+            reply_markup=reply_markup,
+        )
 
 
 @router.callback_query(F.data == "main_action:subscribe")
@@ -135,6 +197,7 @@ async def my_subscription_command_handler(
 
     if not active:
         text = get_text("subscription_not_active")
+        image_name = _menu_image_if_exists("menu_my_subscription.png")
 
         buy_button = InlineKeyboardButton(
             text=get_text("menu_subscribe_inline"), callback_data="main_action:subscribe"
@@ -149,11 +212,18 @@ async def my_subscription_command_handler(
             except Exception:
                 pass
             try:
-                await event.message.edit_text(text, reply_markup=kb)
+                await update_menu_message(
+                    event.message,
+                    text,
+                    image_name,
+                    reply_markup=kb,
+                    parse_mode=ParseMode.HTML,
+                    disable_link_preview=True,
+                )
             except Exception:
-                await event.message.answer(text, reply_markup=kb)
+                await _send_menu_with_image(event.message, text, image_name, reply_markup=kb)
         else:
-            await event.answer(text, reply_markup=kb)
+            await _send_menu_with_image(target, text, image_name, reply_markup=kb)
         return
 
     end_date = active.get("end_date")
@@ -305,6 +375,7 @@ async def my_subscription_command_handler(
     except Exception:
         pass
     markup = InlineKeyboardMarkup(inline_keyboard=kb)
+    image_name = _menu_image_if_exists("menu_my_subscription.png")
 
     if isinstance(event, types.CallbackQuery):
         try:
@@ -312,17 +383,18 @@ async def my_subscription_command_handler(
         except Exception:
             pass
         try:
-            await event.message.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
-        except Exception:
-            await bot.send_message(
-                chat_id=target.chat.id,
-                text=text,
+            await update_menu_message(
+                event.message,
+                text,
+                image_name,
                 reply_markup=markup,
-                parse_mode="HTML",
-                disable_web_page_preview=True,
+                parse_mode=ParseMode.HTML,
+                disable_link_preview=True,
             )
+        except Exception:
+            await _send_menu_with_image(target, text, image_name, reply_markup=markup)
     else:
-        await target.answer(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
+        await _send_menu_with_image(target, text, image_name, reply_markup=markup)
 
 
 @router.callback_query(F.data == "main_action:my_devices")

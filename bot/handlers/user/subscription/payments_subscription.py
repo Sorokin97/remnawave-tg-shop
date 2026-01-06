@@ -5,8 +5,11 @@ from aiogram import F, Router, types
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.inline.user_keyboards import get_payment_method_keyboard
+from bot.utils.menu_renderer import update_menu_message
 from bot.middlewares.i18n import JsonI18n
 from config.settings import Settings
+from bot.handlers.user.subscription.core import _menu_image_if_exists, _send_menu_with_image
+from aiogram.enums import ParseMode
 
 router = Router(name="user_subscription_payments_selection_router")
 
@@ -93,14 +96,27 @@ async def select_subscription_period_callback_handler(
         settings,
         sale_mode="traffic" if traffic_mode else "subscription",
     )
+    image_name = _menu_image_if_exists("menu_subscribe.png")
 
     try:
-        await callback.message.edit_text(text_content, reply_markup=reply_markup)
+        await update_menu_message(
+            callback.message,
+            text_content,
+            image_name,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML,
+            disable_link_preview=True,
+        )
     except Exception as e_edit:
         logging.warning(
             f"Edit message for payment method selection failed: {e_edit}. Sending new one."
         )
-        await callback.message.answer(text_content, reply_markup=reply_markup)
+        await _send_menu_with_image(
+            callback.message,
+            text_content,
+            image_name,
+            reply_markup=reply_markup,
+        )
     try:
         await callback.answer()
     except Exception:

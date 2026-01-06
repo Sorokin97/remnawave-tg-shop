@@ -2,6 +2,7 @@ import logging
 from typing import Optional
 
 from aiogram import F, Router, types
+from aiogram.enums import ParseMode
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.inline.user_keyboards import get_payment_url_keyboard
@@ -9,8 +10,14 @@ from bot.middlewares.i18n import JsonI18n
 from bot.services.severpay_service import SeverPayService
 from config.settings import Settings
 from db.dal import payment_dal
+from bot.utils.menu_renderer import update_menu_message
+from bot.handlers.user.subscription.core import _menu_image_if_exists, _send_menu_with_image
 
 router = Router(name="user_subscription_payments_severpay_router")
+
+
+def _format_value(val: float) -> str:
+    return str(int(val)) if float(val).is_integer() else f"{val:g}"
 
 
 @router.callback_query(F.data.startswith("pay_severpay:"))
@@ -96,6 +103,7 @@ async def pay_severpay_callback_handler(
             pass
         return
 
+    human_value = str(int(months)) if float(months).is_integer() else f"{months:g}"
     success, response_data = await severpay_service.create_payment(
         payment_db_id=payment_record.payment_id,
         user_id=user_id,
@@ -130,39 +138,41 @@ async def pay_severpay_callback_handler(
                 )
 
         if payment_link:
+            price_display = human_value if sale_mode == "traffic" else _format_value(float(price_rub))
+            currency_symbol = settings.DEFAULT_CURRENCY_SYMBOL
+            image_name = _menu_image_if_exists("menu_subscribe.png")
+            payment_text = get_text(
+                key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+                months=int(months),
+                traffic_gb=human_value,
+                price=price_display,
+                currency_symbol=currency_symbol,
+            )
+            markup = get_payment_url_keyboard(
+                payment_link,
+                current_lang,
+                i18n,
+                back_callback=f"subscribe_period:{human_value}",
+                back_text_key="back_to_payment_methods_button",
+            )
             try:
-                await callback.message.edit_text(
-                    get_text(
-                        key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
-                        months=int(months),
-                        traffic_gb=human_value,
-                    ),
-                    reply_markup=get_payment_url_keyboard(
-                        payment_link,
-                        current_lang,
-                        i18n,
-                        back_callback=f"subscribe_period:{human_value}",
-                        back_text_key="back_to_payment_methods_button",
-                    ),
-                    disable_web_page_preview=False,
+                await update_menu_message(
+                    callback.message,
+                    payment_text,
+                    image_name,
+                    reply_markup=markup,
+                    parse_mode=ParseMode.HTML,
+                    disable_link_preview=True,
                 )
             except Exception as e_edit:
                 logging.warning(f"SeverPay: failed to display payment link ({e_edit}), sending new message.")
                 try:
-                    await callback.message.answer(
-                        get_text(
-                            key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
-                            months=int(months),
-                            traffic_gb=human_value,
-                        ),
-                        reply_markup=get_payment_url_keyboard(
-                            payment_link,
-                            current_lang,
-                            i18n,
-                            back_callback=f"subscribe_period:{human_value}",
-                            back_text_key="back_to_payment_methods_button",
-                        ),
-                        disable_web_page_preview=False,
+                    await _send_menu_with_image(
+                        callback.message,
+                        payment_text,
+                        image_name,
+                        reply_markup=markup,
+                        parse_mode=ParseMode.HTML,
                     )
                 except Exception:
                     pass
