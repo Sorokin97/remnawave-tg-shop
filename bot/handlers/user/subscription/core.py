@@ -3,7 +3,6 @@ import logging
 from aiogram import Router, F, types, Bot
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from aiogram.enums import ParseMode
 from typing import Optional, Union
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +19,6 @@ from bot.services.panel_api_service import PanelApiService
 from bot.middlewares.i18n import JsonI18n
 from db.dal import subscription_dal, user_billing_dal
 from db.models import Subscription
-from bot.utils.menu_renderer import render_menu_content
 
 router = Router(name="user_subscription_core_router")
 
@@ -92,19 +90,17 @@ async def display_subscription_options(event: Union[types.Message, types.Callbac
                 pass
         return
 
-    image_name = "menu_traffic_options.png" if traffic_mode else "menu_subscription_options.png"
-    await render_menu_content(
-        event,
-        text_content,
-        image_filename=image_name,
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML,
-    )
     if isinstance(event, types.CallbackQuery):
+        try:
+            await target_message_obj.edit_text(text_content, reply_markup=reply_markup)
+        except Exception:
+            await target_message_obj.answer(text_content, reply_markup=reply_markup)
         try:
             await event.answer()
         except Exception:
             pass
+    else:
+        await target_message_obj.answer(text_content, reply_markup=reply_markup)
 
 
 @router.callback_query(F.data == "main_action:subscribe")
@@ -146,18 +142,18 @@ async def my_subscription_command_handler(
         back_markup = get_back_to_main_menu_markup(current_lang, i18n)
 
         kb = InlineKeyboardMarkup(inline_keyboard=[[buy_button], *back_markup.inline_keyboard])
-        await render_menu_content(
-            event,
-            text,
-            image_filename="menu_my_subscription.png",
-            reply_markup=kb,
-            parse_mode=ParseMode.HTML,
-        )
+
         if isinstance(event, types.CallbackQuery):
             try:
                 await event.answer()
             except Exception:
                 pass
+            try:
+                await event.message.edit_text(text, reply_markup=kb)
+            except Exception:
+                await event.message.answer(text, reply_markup=kb)
+        else:
+            await event.answer(text, reply_markup=kb)
         return
 
     end_date = active.get("end_date")
@@ -310,18 +306,23 @@ async def my_subscription_command_handler(
         pass
     markup = InlineKeyboardMarkup(inline_keyboard=kb)
 
-    await render_menu_content(
-        event,
-        text,
-        image_filename="menu_my_subscription.png",
-        reply_markup=markup,
-        parse_mode=ParseMode.HTML,
-    )
     if isinstance(event, types.CallbackQuery):
         try:
             await event.answer()
         except Exception:
             pass
+        try:
+            await event.message.edit_text(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
+        except Exception:
+            await bot.send_message(
+                chat_id=target.chat.id,
+                text=text,
+                reply_markup=markup,
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+    else:
+        await target.answer(text, reply_markup=markup, parse_mode="HTML", disable_web_page_preview=True)
 
 
 @router.callback_query(F.data == "main_action:my_devices")

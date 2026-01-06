@@ -3,13 +3,11 @@ import logging
 from typing import Optional
 
 from aiogram import F, Router, types
-from aiogram.enums import ParseMode
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.inline.user_keyboards import get_payment_url_keyboard
 from bot.middlewares.i18n import JsonI18n
 from bot.services.platega_service import PlategaService
-from bot.utils.menu_renderer import render_menu_content
 from config.settings import Settings
 from db.dal import payment_dal
 
@@ -144,14 +142,12 @@ async def pay_platega_callback_handler(
                 )
 
             try:
-                await render_menu_content(
-                    callback,
+                await callback.message.edit_text(
                     get_text(
                         key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
                         months=int(months),
                         traffic_gb=human_value,
                     ),
-                    image_filename="menu_payment_link.png",
                     reply_markup=get_payment_url_keyboard(
                         redirect_url,
                         current_lang,
@@ -159,11 +155,28 @@ async def pay_platega_callback_handler(
                         back_callback=f"subscribe_period:{human_value}",
                         back_text_key="back_to_payment_methods_button",
                     ),
-                    parse_mode=ParseMode.HTML,
-                    disable_link_preview=True,
+                    disable_web_page_preview=False,
                 )
             except Exception as e_edit:
                 logging.warning(f"Platega: failed to display payment link ({e_edit}), sending new message.")
+                try:
+                    await callback.message.answer(
+                        get_text(
+                            key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+                            months=int(months),
+                            traffic_gb=human_value,
+                        ),
+                        reply_markup=get_payment_url_keyboard(
+                            redirect_url,
+                            current_lang,
+                            i18n,
+                            back_callback=f"subscribe_period:{human_value}",
+                            back_text_key="back_to_payment_methods_button",
+                        ),
+                        disable_web_page_preview=False,
+                    )
+                except Exception:
+                    pass
             try:
                 await callback.answer()
             except Exception:

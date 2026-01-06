@@ -2,7 +2,6 @@ import logging
 from typing import List, Optional, Tuple
 
 from aiogram import F, Router, types
-from aiogram.enums import ParseMode
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.inline.user_keyboards import (
@@ -13,7 +12,6 @@ from bot.keyboards.inline.user_keyboards import (
 )
 from bot.middlewares.i18n import JsonI18n
 from bot.services.yookassa_service import YooKassaService
-from bot.utils.menu_renderer import render_menu_content
 from config.settings import Settings
 from db.dal import payment_dal, user_billing_dal
 
@@ -214,14 +212,12 @@ async def _initiate_yk_payment(
             return False
 
         try:
-            await render_menu_content(
-                callback,
+            await callback.message.edit_text(
                 get_text(
                     key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
                     months=int(months),
                     traffic_gb=_format_value(months),
                 ),
-                image_filename="menu_payment_link.png",
                 reply_markup=get_payment_url_keyboard(
                     payment_response_yk["confirmation_url"],
                     current_lang,
@@ -229,13 +225,30 @@ async def _initiate_yk_payment(
                     back_callback=back_callback,
                     back_text_key="back_to_payment_methods_button",
                 ),
-                parse_mode=ParseMode.HTML,
-                disable_link_preview=True,
+                disable_web_page_preview=False,
             )
         except Exception as e_edit:
             logging.warning(
                 f"Edit message for payment link failed: {e_edit}. Sending new one."
             )
+            try:
+                await callback.message.answer(
+                    get_text(
+                        key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+                        months=int(months),
+                        traffic_gb=_format_value(months),
+                    ),
+                    reply_markup=get_payment_url_keyboard(
+                        payment_response_yk["confirmation_url"],
+                        current_lang,
+                        i18n,
+                        back_callback=back_callback,
+                        back_text_key="back_to_payment_methods_button",
+                    ),
+                    disable_web_page_preview=False,
+                )
+            except Exception:
+                pass
         return True
 
     if payment_response_yk and payment_method_id:

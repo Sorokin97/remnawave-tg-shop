@@ -1,13 +1,11 @@
 from typing import Optional
 
 from aiogram import F, Router, types
-from aiogram.enums import ParseMode
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.inline.user_keyboards import get_payment_url_keyboard
 from bot.middlewares.i18n import JsonI18n
 from bot.services.crypto_pay_service import CryptoPayService
-from bot.utils.menu_renderer import render_menu_content
 from config.settings import Settings
 
 router = Router(name="user_subscription_payments_crypto_router")
@@ -70,24 +68,41 @@ async def pay_crypto_callback_handler(
     )
 
     if invoice_url:
-        await render_menu_content(
-            callback,
-            get_text(
-                key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
-                months=int(months),
-                traffic_gb=human_value,
-            ),
-            image_filename="menu_payment_link.png",
-            reply_markup=get_payment_url_keyboard(
-                invoice_url,
-                current_lang,
-                i18n,
-                back_callback=f"subscribe_period:{human_value}",
-                back_text_key="back_to_payment_methods_button",
-            ),
-            parse_mode=ParseMode.HTML,
-            disable_link_preview=True,
-        )
+        try:
+            await callback.message.edit_text(
+                get_text(
+                    key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+                    months=int(months),
+                    traffic_gb=human_value,
+                ),
+                reply_markup=get_payment_url_keyboard(
+                    invoice_url,
+                    current_lang,
+                    i18n,
+                    back_callback=f"subscribe_period:{human_value}",
+                    back_text_key="back_to_payment_methods_button",
+                ),
+                disable_web_page_preview=False,
+            )
+        except Exception:
+            try:
+                await callback.message.answer(
+                    get_text(
+                        key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+                        months=int(months),
+                        traffic_gb=human_value,
+                    ),
+                    reply_markup=get_payment_url_keyboard(
+                        invoice_url,
+                        current_lang,
+                        i18n,
+                        back_callback=f"subscribe_period:{human_value}",
+                        back_text_key="back_to_payment_methods_button",
+                    ),
+                    disable_web_page_preview=False,
+                )
+            except Exception:
+                pass
         try:
             await callback.answer()
         except Exception:
