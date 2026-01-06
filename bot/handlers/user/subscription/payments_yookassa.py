@@ -10,6 +10,7 @@ from bot.keyboards.inline.user_keyboards import (
     get_yk_autopay_choice_keyboard,
     get_yk_saved_cards_keyboard,
 )
+from bot.handlers.user.subscription.core import _menu_image_if_exists, _send_menu_with_image, render_subscribe_menu
 from bot.middlewares.i18n import JsonI18n
 from bot.services.yookassa_service import YooKassaService
 from config.settings import Settings
@@ -211,17 +212,17 @@ async def _initiate_yk_payment(
                 pass
             return False
 
+        payment_text = get_text(
+            key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+            months=int(months),
+            traffic_gb=_format_value(months),
+            price=_format_value(price_rub),
+            currency_symbol=settings.DEFAULT_CURRENCY_SYMBOL,
+        )
         try:
-            price_display = _format_value(price_rub)
-            currency_symbol = settings.DEFAULT_CURRENCY_SYMBOL
-            await callback.message.edit_text(
-                get_text(
-                    key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
-                    months=int(months),
-                    traffic_gb=_format_value(months),
-                    price=price_display,
-                    currency_symbol=currency_symbol,
-                ),
+            await render_subscribe_menu(
+                callback.message,
+                payment_text,
                 reply_markup=get_payment_url_keyboard(
                     payment_response_yk["confirmation_url"],
                     current_lang,
@@ -229,23 +230,16 @@ async def _initiate_yk_payment(
                     back_callback=back_callback,
                     back_text_key="back_to_payment_methods_button",
                 ),
-                disable_web_page_preview=True,
             )
         except Exception as e_edit:
             logging.warning(
                 f"Edit message for payment link failed: {e_edit}. Sending new one."
             )
             try:
-                price_display = _format_value(price_rub)
-                currency_symbol = settings.DEFAULT_CURRENCY_SYMBOL
-                await callback.message.answer(
-                    get_text(
-                        key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
-                        months=int(months),
-                        traffic_gb=_format_value(months),
-                        price=price_display,
-                        currency_symbol=currency_symbol,
-                    ),
+                await _send_menu_with_image(
+                    callback.message,
+                    payment_text,
+                    _menu_image_if_exists("menu_subscribe.png"),
                     reply_markup=get_payment_url_keyboard(
                         payment_response_yk["confirmation_url"],
                         current_lang,
@@ -253,7 +247,6 @@ async def _initiate_yk_payment(
                         back_callback=back_callback,
                         back_text_key="back_to_payment_methods_button",
                     ),
-                    disable_web_page_preview=True,
                 )
             except Exception:
                 pass

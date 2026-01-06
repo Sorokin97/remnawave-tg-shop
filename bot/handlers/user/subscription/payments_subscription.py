@@ -5,10 +5,9 @@ from aiogram import F, Router, types
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.inline.user_keyboards import get_payment_method_keyboard
-from bot.utils.menu_renderer import update_menu_message
 from bot.middlewares.i18n import JsonI18n
 from config.settings import Settings
-from bot.handlers.user.subscription.core import _menu_image_if_exists, _send_menu_with_image
+from bot.handlers.user.subscription.core import _menu_image_if_exists, _send_menu_with_image, render_subscribe_menu
 from aiogram.enums import ParseMode
 
 router = Router(name="user_subscription_payments_selection_router")
@@ -96,16 +95,14 @@ async def select_subscription_period_callback_handler(
         settings,
         sale_mode="traffic" if traffic_mode else "subscription",
     )
-    image_name = _menu_image_if_exists("menu_payment_methods.png")
+    image_name = _menu_image_if_exists("menu_subscribe.png")
 
     try:
-        await update_menu_message(
+        await render_subscribe_menu(
             callback.message,
             text_content,
-            image_name,
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML,
-            disable_link_preview=True,
         )
     except Exception as e_edit:
         logging.warning(

@@ -26,11 +26,16 @@ from bot.utils.menu_renderer import update_menu_message
 router = Router(name="user_subscription_core_router")
 
 MENU_IMAGES_ROOT = Path("/app/bot/static/images")
+SUBSCRIBE_MENU_IMAGE = "menu_subscribe.png"
 
 
 def _menu_image_if_exists(filename: str) -> Optional[str]:
     image_path = MENU_IMAGES_ROOT / filename
     return filename if image_path.is_file() else None
+
+
+def _get_subscribe_menu_image() -> Optional[str]:
+    return _menu_image_if_exists(SUBSCRIBE_MENU_IMAGE)
 
 
 async def _send_menu_with_image(
@@ -64,6 +69,34 @@ async def _send_menu_with_image(
         parse_mode=parse_mode,
         link_preview_options=link_preview_disabled,
     )
+
+
+async def render_subscribe_menu(
+    target_message: types.Message,
+    text: str,
+    reply_markup=None,
+    parse_mode: Optional[str] = ParseMode.HTML,
+):
+    """Render a subscription-related menu with the standard subscribe background."""
+    image_name = _get_subscribe_menu_image()
+    try:
+        await update_menu_message(
+            target_message,
+            text,
+            image_name,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+            disable_link_preview=True,
+        )
+    except Exception as render_error:
+        logging.warning("Failed to render subscribe menu, sending a new message: %s", render_error)
+        await _send_menu_with_image(
+            target_message,
+            text,
+            image_name,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+        )
 
 
 def _shorten_hwid_for_display(hwid: Optional[str], max_length: int = 24) -> str:
@@ -115,16 +148,16 @@ async def display_subscription_options(event: Union[types.Message, types.Callbac
     else:
         options = settings.subscription_options
 
+    image_name = _get_subscribe_menu_image()
+
     if options:
         text_content = get_text("select_traffic_package") if traffic_mode else get_text("select_subscription_period")
         reply_markup = get_subscription_options_keyboard(
             options, currency_symbol_val, current_lang, i18n, traffic_mode=traffic_mode
         )
-        image_name = _menu_image_if_exists("menu_subscription_options.png")
     else:
         text_content = get_text("no_subscription_options_available")
         reply_markup = get_back_to_main_menu_markup(current_lang, i18n)
-        image_name = None
 
     target_message_obj = event.message if isinstance(event, types.CallbackQuery) else event
     if not target_message_obj:
@@ -137,13 +170,11 @@ async def display_subscription_options(event: Union[types.Message, types.Callbac
 
     if isinstance(event, types.CallbackQuery):
         try:
-            await update_menu_message(
+            await render_subscribe_menu(
                 target_message_obj,
                 text_content,
-                image_name,
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML,
-                disable_link_preview=True,
             )
         except Exception:
             await _send_menu_with_image(

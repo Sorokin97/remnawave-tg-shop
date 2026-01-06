@@ -9,6 +9,7 @@ from bot.middlewares.i18n import JsonI18n
 from bot.services.severpay_service import SeverPayService
 from config.settings import Settings
 from db.dal import payment_dal
+from bot.handlers.user.subscription.core import _menu_image_if_exists, _send_menu_with_image, render_subscribe_menu
 
 router = Router(name="user_subscription_payments_severpay_router")
 
@@ -137,15 +138,17 @@ async def pay_severpay_callback_handler(
         if payment_link:
             price_display = human_value if sale_mode == "traffic" else _format_value(float(price_rub))
             currency_symbol = settings.DEFAULT_CURRENCY_SYMBOL
+            payment_text = get_text(
+                key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
+                months=int(months),
+                traffic_gb=human_value,
+                price=price_display,
+                currency_symbol=currency_symbol,
+            )
             try:
-                await callback.message.edit_text(
-                    get_text(
-                        key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
-                        months=int(months),
-                        traffic_gb=human_value,
-                        price=price_display,
-                        currency_symbol=currency_symbol,
-                    ),
+                await render_subscribe_menu(
+                    callback.message,
+                    payment_text,
                     reply_markup=get_payment_url_keyboard(
                         payment_link,
                         current_lang,
@@ -153,19 +156,14 @@ async def pay_severpay_callback_handler(
                         back_callback=f"subscribe_period:{human_value}",
                         back_text_key="back_to_payment_methods_button",
                     ),
-                    disable_web_page_preview=True,
                 )
             except Exception as e_edit:
                 logging.warning(f"SeverPay: failed to display payment link ({e_edit}), sending new message.")
                 try:
-                    await callback.message.answer(
-                        get_text(
-                            key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
-                            months=int(months),
-                            traffic_gb=human_value,
-                            price=price_display,
-                            currency_symbol=currency_symbol,
-                        ),
+                    await _send_menu_with_image(
+                        callback.message,
+                        payment_text,
+                        _menu_image_if_exists("menu_subscribe.png"),
                         reply_markup=get_payment_url_keyboard(
                             payment_link,
                             current_lang,
@@ -173,7 +171,6 @@ async def pay_severpay_callback_handler(
                             back_callback=f"subscribe_period:{human_value}",
                             back_text_key="back_to_payment_methods_button",
                         ),
-                        disable_web_page_preview=True,
                     )
                 except Exception:
                     pass
