@@ -13,6 +13,10 @@ from db.dal import payment_dal
 router = Router(name="user_subscription_payments_severpay_router")
 
 
+def _format_value(val: float) -> str:
+    return str(int(val)) if float(val).is_integer() else f"{val:g}"
+
+
 @router.callback_query(F.data.startswith("pay_severpay:"))
 async def pay_severpay_callback_handler(
     callback: types.CallbackQuery,
@@ -96,6 +100,7 @@ async def pay_severpay_callback_handler(
             pass
         return
 
+    human_value = str(int(months)) if float(months).is_integer() else f"{months:g}"
     success, response_data = await severpay_service.create_payment(
         payment_db_id=payment_record.payment_id,
         user_id=user_id,
@@ -130,12 +135,16 @@ async def pay_severpay_callback_handler(
                 )
 
         if payment_link:
+            price_display = human_value if sale_mode == "traffic" else _format_value(float(price_rub))
+            currency_symbol = settings.DEFAULT_CURRENCY_SYMBOL
             try:
                 await callback.message.edit_text(
                     get_text(
                         key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
                         months=int(months),
                         traffic_gb=human_value,
+                        price=price_display,
+                        currency_symbol=currency_symbol,
                     ),
                     reply_markup=get_payment_url_keyboard(
                         payment_link,
@@ -144,7 +153,7 @@ async def pay_severpay_callback_handler(
                         back_callback=f"subscribe_period:{human_value}",
                         back_text_key="back_to_payment_methods_button",
                     ),
-                    disable_web_page_preview=False,
+                    disable_web_page_preview=True,
                 )
             except Exception as e_edit:
                 logging.warning(f"SeverPay: failed to display payment link ({e_edit}), sending new message.")
@@ -154,6 +163,8 @@ async def pay_severpay_callback_handler(
                             key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
                             months=int(months),
                             traffic_gb=human_value,
+                            price=price_display,
+                            currency_symbol=currency_symbol,
                         ),
                         reply_markup=get_payment_url_keyboard(
                             payment_link,
@@ -162,7 +173,7 @@ async def pay_severpay_callback_handler(
                             back_callback=f"subscribe_period:{human_value}",
                             back_text_key="back_to_payment_methods_button",
                         ),
-                        disable_web_page_preview=False,
+                        disable_web_page_preview=True,
                     )
                 except Exception:
                     pass

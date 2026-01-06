@@ -72,7 +72,7 @@ async def _initiate_yk_payment(
     payment_method_id: Optional[str] = None,
     selected_method_internal_id: Optional[int] = None,
     sale_mode: str = "subscription",
-) -> bool:
+    ) -> bool:
     """Create payment record and initiate YooKassa payment (new card or saved card)."""
     if not callback.message:
         return False
@@ -212,11 +212,15 @@ async def _initiate_yk_payment(
             return False
 
         try:
+            price_display = _format_value(price_rub)
+            currency_symbol = settings.DEFAULT_CURRENCY_SYMBOL
             await callback.message.edit_text(
                 get_text(
                     key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
                     months=int(months),
                     traffic_gb=_format_value(months),
+                    price=price_display,
+                    currency_symbol=currency_symbol,
                 ),
                 reply_markup=get_payment_url_keyboard(
                     payment_response_yk["confirmation_url"],
@@ -225,18 +229,22 @@ async def _initiate_yk_payment(
                     back_callback=back_callback,
                     back_text_key="back_to_payment_methods_button",
                 ),
-                disable_web_page_preview=False,
+                disable_web_page_preview=True,
             )
         except Exception as e_edit:
             logging.warning(
                 f"Edit message for payment link failed: {e_edit}. Sending new one."
             )
             try:
+                price_display = _format_value(price_rub)
+                currency_symbol = settings.DEFAULT_CURRENCY_SYMBOL
                 await callback.message.answer(
                     get_text(
                         key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
                         months=int(months),
                         traffic_gb=_format_value(months),
+                        price=price_display,
+                        currency_symbol=currency_symbol,
                     ),
                     reply_markup=get_payment_url_keyboard(
                         payment_response_yk["confirmation_url"],
@@ -245,7 +253,7 @@ async def _initiate_yk_payment(
                         back_callback=back_callback,
                         back_text_key="back_to_payment_methods_button",
                     ),
-                    disable_web_page_preview=False,
+                    disable_web_page_preview=True,
                 )
             except Exception:
                 pass
