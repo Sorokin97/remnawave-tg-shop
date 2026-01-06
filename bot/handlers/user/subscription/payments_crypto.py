@@ -57,6 +57,8 @@ async def pay_crypto_callback_handler(
         if sale_mode == "traffic"
         else get_text("payment_description_subscription", months=int(months))
     )
+    price_display = human_value if sale_mode == "traffic" else str(price_amount)
+    currency_symbol = settings.DEFAULT_CURRENCY_SYMBOL
 
     invoice_url = await cryptopay_service.create_invoice(
         session=session,
@@ -74,6 +76,8 @@ async def pay_crypto_callback_handler(
                     key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
                     months=int(months),
                     traffic_gb=human_value,
+                    price=price_display,
+                    currency_symbol=currency_symbol,
                 ),
                 reply_markup=get_payment_url_keyboard(
                     invoice_url,
@@ -82,7 +86,7 @@ async def pay_crypto_callback_handler(
                     back_callback=f"subscribe_period:{human_value}",
                     back_text_key="back_to_payment_methods_button",
                 ),
-                disable_web_page_preview=False,
+                disable_web_page_preview=True,
             )
         except Exception:
             try:
@@ -91,6 +95,8 @@ async def pay_crypto_callback_handler(
                         key="payment_link_message_traffic" if sale_mode == "traffic" else "payment_link_message",
                         months=int(months),
                         traffic_gb=human_value,
+                        price=price_display,
+                        currency_symbol=currency_symbol,
                     ),
                     reply_markup=get_payment_url_keyboard(
                         invoice_url,
@@ -99,7 +105,7 @@ async def pay_crypto_callback_handler(
                         back_callback=f"subscribe_period:{human_value}",
                         back_text_key="back_to_payment_methods_button",
                     ),
-                    disable_web_page_preview=False,
+                    disable_web_page_preview=True,
                 )
             except Exception:
                 pass
