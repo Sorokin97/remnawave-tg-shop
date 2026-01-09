@@ -428,7 +428,7 @@
   "admin_payments_pagination_info": "📊 Показано {shown} из {total} платежей (стр. {current_page}/{total_pages})",
   "admin_payment_traffic_label": "🗂 Трафик: <b>{traffic_gb} ГБ</b>",
   "admin_payment_months_label": "📅 Период: <b>{months} мес.</b>",
-  "my_subscription_details": "🔐 <b>Моя подписка</b>\n\n⏰ Статус: <b>{status}</b>\n📅 Действует до: <b>{end_date}</b>\n📆 Осталось дней: <b>{days_left}</b>\n\n🔗 Ссылка на конфигурацию:\n<code>{config_link}</code>\n\n📊 Трафик:\nЛимит: <b>{traffic_limit}</b>\nИспользовано: <b>{traffic_used}</b>",
+  "my_subscription_details": "🔐 <b>Моя подписка</b>\n\n⏰ Статус: <b>{status}</b>\n📅 Действует до: <b>{end_date}</b>\n📆 Осталось дней: <b>{days_left}</b>\n\n🔗 Ссылка на конфигурацию:\n<pre><code>{config_link}</code></pre>\n\n📊 Трафик:\nЛимит: <b>{traffic_limit}</b>\nИспользовано: <b>{traffic_used}</b>",
   "my_traffic_details": "🔐 <b>Мой трафик</b>\n\n⏰ Статус: <b>{status}</b>\n📅 Действует до: <b>{end_date}</b>\n\n🔗 Ссылка на конфигурацию:\n<code>{config_link}</code>\n\n📊 Трафик:\nЛимит: <b>{traffic_limit}</b>\nИспользовано: <b>{traffic_used}</b>\nОсталось: <b>{traffic_left}</b>",
   "traffic_no_expiry": "без ограничения",
   "autorenew_enable_button": "🔄 Включить автопродление",
