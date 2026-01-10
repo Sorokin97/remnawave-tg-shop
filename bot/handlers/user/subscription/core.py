@@ -541,11 +541,20 @@ async def my_devices_command_handler(
         except Exception:
             pass
         try:
-            await event.message.edit_text(text, reply_markup=markup)
+            updated = await update_menu_message(
+                event.message,
+                text,
+                None,
+                reply_markup=markup,
+                parse_mode=ParseMode.HTML,
+                disable_link_preview=True,
+            )
         except Exception:
-            await event.message.answer(text, reply_markup=markup)
+            updated = False
+        if not updated:
+            await event.message.answer(text, reply_markup=markup, parse_mode=ParseMode.HTML)
     else:
-        await target.answer(text, reply_markup=markup)
+        await target.answer(text, reply_markup=markup, parse_mode=ParseMode.HTML)
 
 
 @router.callback_query(F.data.startswith("disconnect_device:"))
